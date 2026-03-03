@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import {
   CheckCircle2,
   Mail,
@@ -44,26 +43,7 @@ const nextSteps = [
 
 export default function WaitlistOnboardingCompletePage() {
   return (
-    <div className="min-h-screen bg-surface-2">
-      {/* Minimal header */}
-      <header className="border-b border-gray-100 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-center px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="EcoPharma — Home">
-            <Image
-              src="/logo-cropped.png"
-              alt="EcoPharma"
-              width={600}
-              height={150}
-              className="h-8 w-auto"
-              style={{
-                filter:
-                  "brightness(0) saturate(100%) invert(25%) sepia(69%) saturate(2187%) hue-rotate(215deg) brightness(93%) contrast(95%)",
-              }}
-            />
-          </Link>
-        </div>
-      </header>
-
+    <div>
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-20 lg:px-8">
         <div className="lg:grid lg:grid-cols-5 lg:gap-12 xl:gap-16">
           {/* ===== LEFT: Main Content (60%) ===== */}
