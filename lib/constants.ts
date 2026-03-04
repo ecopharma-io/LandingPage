@@ -7,7 +7,7 @@ export const SITE = {
   name: "EcoPharma",
   tagline: "Shopify for Pharmacies",
   description:
-    "The modern, all-in-one e-commerce platform built for independent pharmacies. Prescription management, HIPAA compliance, and telehealth — ready to go.",
+    "EcoPharma is the all-in-one e-commerce platform built for independent pharmacies. Launch your online store in 24 hours with prescription management, HIPAA-compliant checkout, telehealth, and local delivery — no coding required.",
   positioning:
     "The modern, all-in-one platform that helps independent pharmacies compete online in 24 hours — not 24 weeks.",
   url: "https://ecopharma.io",
