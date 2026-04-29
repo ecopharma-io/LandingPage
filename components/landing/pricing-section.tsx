@@ -9,9 +9,6 @@ import { AnimateOnScroll } from "@/components/shared/animate-on-scroll";
 import { LIFETIME_DEAL } from "@/lib/pricing";
 
 export function PricingSection() {
-  const spotsUsed = LIFETIME_DEAL.spotsTotal - LIFETIME_DEAL.spotsRemaining;
-  const spotsPercent = (spotsUsed / LIFETIME_DEAL.spotsTotal) * 100;
-
   return (
     <section id="pricing" className="scroll-mt-20 relative overflow-hidden bg-surface-2 py-24 lg:py-32">
       {/* Warm blobs */}
@@ -87,21 +84,12 @@ export function PricingSection() {
               </span>
             </div>
 
-            {/* Spots remaining */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">
-                  {LIFETIME_DEAL.spotsRemaining} of {LIFETIME_DEAL.spotsTotal}{" "}
-                  spots left
-                </span>
-                <span className="text-gray-500">{Math.round(spotsPercent)}% claimed</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400"
-                  style={{ width: `${spotsPercent}%` }}
-                />
-              </div>
+            {/* Limited spots — static urgency pill */}
+            <div className="mt-6 flex justify-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+                Limited founder spots — closing soon
+              </span>
             </div>
 
             {/* CTA */}

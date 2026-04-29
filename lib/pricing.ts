@@ -9,11 +9,8 @@ export interface LifetimeDeal {
   originalMonthly: number;
   originalYearly: number;
   savingsPercent: number;
-  spotsTotal: number;
-  spotsRemaining: number;
   badge: string;
   ctaText: string;
-  paymentLink: string;
   guarantee: string;
   features: string[];
 }
@@ -24,11 +21,8 @@ export const LIFETIME_DEAL: LifetimeDeal = {
   originalMonthly: 999,
   originalYearly: 11988,
   savingsPercent: 92,
-  spotsTotal: 50,
-  spotsRemaining: 47,
   badge: "Founder's Program — Limited Spots",
   ctaText: "Claim Lifetime Access — $999",
-  paymentLink: "#", // TODO: Replace with Dodo Payments link
   guarantee: "60-day money-back guarantee. No questions asked.",
   features: [
     "Unlimited pharmacy locations",
