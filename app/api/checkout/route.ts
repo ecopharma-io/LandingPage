@@ -375,26 +375,23 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
-    // Send emails + append to Google Sheet in parallel
-    const labels = ["notifyEmail", "welcomeEmail", "googleSheet"];
+    // Side effects (team email + Sheet) must not block payment — failures are logged, not surfaced.
+    const labels = ["notifyEmail", "googleSheet"];
     const results = await Promise.allSettled([
       sendCheckoutEmail(data),
-      sendFounderWelcomeEmail(data),
       appendToGoogleSheet(data),
     ]);
 
-    const errors: string[] = [];
     results.forEach((result, i) => {
       if (result.status === "rejected") {
         const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
         console.error(`[CHECKOUT ${labels[i]}] FAILED:`, msg);
-        errors.push(`${labels[i]}: ${msg}`);
       } else {
         console.log(`[CHECKOUT ${labels[i]}] OK`);
       }
     });
 
-    return NextResponse.json({ success: true, errors: errors.length ? errors : undefined });
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json(
       { success: false, error: "Something went wrong. Please try again." },

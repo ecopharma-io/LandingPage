@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { DodoPayments } from "dodopayments-checkout";
 import Link from "next/link";
 import {
   User,
@@ -255,11 +256,56 @@ export default function CheckoutPage() {
   const [step2, setStep2] = useState<Step2Data>(initialStep2);
   const [errors, setErrors] = useState<FormErrors>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [status, setStatus] = useState<"idle" | "loading">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "saving-lead" | "creating-session" | "awaiting-payment" | "success"
+  >("idle");
+  const dodoInitialized = useRef(false);
 
   const clearError = useCallback((key: string) => {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }, []);
+
+  // Initialize Dodo Payments SDK once
+  useEffect(() => {
+    if (dodoInitialized.current) return;
+    dodoInitialized.current = true;
+
+    const mode = (process.env.NEXT_PUBLIC_DODO_MODE || "test") as "test" | "live";
+
+    DodoPayments.Initialize({
+      mode,
+      displayType: "overlay",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onEvent: (event: any) => {
+        if (event.event_type === "checkout.status") {
+          const paymentStatus = event.data?.message?.status;
+          if (paymentStatus === "succeeded") {
+            DodoPayments.Checkout.close();
+            setStatus("success");
+            setTimeout(() => router.push("/thank-you"), 3000);
+          } else if (paymentStatus === "failed") {
+            DodoPayments.Checkout.close();
+            setStatus("idle");
+            toast.error("Payment failed. Please try again.");
+          }
+        } else if (event.event_type === "checkout.closed") {
+          setStatus("idle");
+        } else if (event.event_type === "checkout.error") {
+          DodoPayments.Checkout.close();
+          setStatus("idle");
+          toast.error("A payment error occurred. Please try again.");
+        } else if (event.event_type === "checkout.link_expired") {
+          DodoPayments.Checkout.close();
+          setStatus("idle");
+          toast.error("Payment session expired. Please try again.");
+        }
+      },
+    });
+
+    return () => {
+      DodoPayments.Checkout.close();
+    };
+  }, [router]);
 
   // ---- Validation ----
   function validateStep1(): FormErrors {
@@ -316,27 +362,48 @@ export default function CheckoutPage() {
       return;
     }
 
-    setStatus("loading");
+    setStatus("saving-lead");
 
     try {
-      const res = await fetch("/api/checkout", {
+      // Step 1: Save lead data (team notification + Google Sheets)
+      const leadRes = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...step1, ...step2 }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Submission failed.");
+      const leadData = await leadRes.json();
+      if (!leadRes.ok || !leadData.success) {
+        throw new Error(leadData.error || "Submission failed.");
       }
 
-      if (LIFETIME_DEAL.paymentLink && LIFETIME_DEAL.paymentLink !== "#") {
-        window.location.href = LIFETIME_DEAL.paymentLink;
-      } else {
-        // Payment not yet configured — redirect to thank-you page
-        router.push("/thank-you");
+      // Step 2: Create Dodo checkout session
+      setStatus("creating-session");
+
+      const sessionRes = await fetch("/api/checkout/create-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: step1.email,
+          name: step1.ownerName,
+        }),
+      });
+
+      const sessionData = await sessionRes.json();
+      if (!sessionRes.ok || !sessionData.checkout_url) {
+        throw new Error(sessionData.error || "Failed to create payment session.");
       }
+
+      // Step 3: Open Dodo overlay
+      setStatus("awaiting-payment");
+
+      DodoPayments.Checkout.open({
+        checkoutUrl: sessionData.checkout_url,
+        options: {
+          manualRedirect: true,
+          showSecurityBadge: true,
+        },
+      });
     } catch (err) {
       setStatus("idle");
       toast.error(
@@ -354,6 +421,117 @@ export default function CheckoutPage() {
       <p id={`co-${field}-error`} className="text-xs text-error">
         {errors[field]}
       </p>
+    );
+  }
+
+  // ---- Success Overlay ----
+  if (status === "success") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm">
+        {/* Confetti particles */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {Array.from({ length: 40 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute animate-confetti"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `-5%`,
+                animationDelay: `${Math.random() * 2}s`,
+                animationDuration: `${2 + Math.random() * 2}s`,
+              }}
+            >
+              <div
+                className="size-2.5 rounded-sm"
+                style={{
+                  backgroundColor: [
+                    "#2563eb",
+                    "#3b82f6",
+                    "#60a5fa",
+                    "#10b981",
+                    "#34d399",
+                    "#6366f1",
+                    "#f59e0b",
+                    "#f97316",
+                  ][i % 8],
+                  transform: `rotate(${Math.random() * 360}deg)`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="relative mx-4 w-full max-w-md animate-scale-in rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-2xl">
+          {/* Checkmark */}
+          <div className="mx-auto mb-6 flex size-20 animate-check-pop items-center justify-center rounded-full bg-green-100">
+            <CheckCircle2 className="size-10 text-green-600" strokeWidth={2.5} />
+          </div>
+
+          <h2 className="text-2xl font-bold text-gray-900">
+            Payment Successful!
+          </h2>
+          <p className="mt-2 text-gray-500">
+            Welcome to EcoPharma, {step1.ownerName.split(" ")[0]}! Your lifetime
+            access has been secured.
+          </p>
+
+          <div className="mt-6 rounded-xl bg-brand-50 px-4 py-3">
+            <p className="text-sm font-medium text-brand-700">
+              Redirecting you to your next steps...
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.push("/thank-you")}
+            className="mt-4 text-sm font-medium text-brand-600 underline underline-offset-2 transition-colors hover:text-brand-800"
+          >
+            Go now
+          </button>
+        </div>
+
+        <style jsx>{`
+          @keyframes confetti-fall {
+            0% {
+              transform: translateY(0) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(100vh) rotate(720deg);
+              opacity: 0;
+            }
+          }
+          @keyframes scale-in {
+            0% {
+              transform: scale(0.8);
+              opacity: 0;
+            }
+            100% {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+          @keyframes check-pop {
+            0% {
+              transform: scale(0);
+            }
+            50% {
+              transform: scale(1.2);
+            }
+            100% {
+              transform: scale(1);
+            }
+          }
+          :global(.animate-confetti) {
+            animation: confetti-fall linear forwards;
+          }
+          :global(.animate-scale-in) {
+            animation: scale-in 0.4s ease-out forwards;
+          }
+          :global(.animate-check-pop) {
+            animation: check-pop 0.5s ease-out 0.2s both;
+          }
+        `}</style>
+      </div>
     );
   }
 
@@ -828,7 +1006,7 @@ export default function CheckoutPage() {
                     variant="outline"
                     onClick={handleBack}
                     className="flex-1"
-                    disabled={status === "loading"}
+                    disabled={status !== "idle"}
                     size="lg"
                   >
                     <ArrowLeft className="mr-2 size-4" />
@@ -836,14 +1014,24 @@ export default function CheckoutPage() {
                   </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={status === "loading" || !agreedToTerms}
+                    disabled={status !== "idle" || !agreedToTerms}
                     className="flex-1 bg-accent-500 text-white hover:bg-accent-600"
                     size="lg"
                   >
-                    {status === "loading" ? (
+                    {status === "saving-lead" ? (
                       <>
                         <Loader2 className="mr-2 size-4 animate-spin" />
-                        Processing...
+                        Saving...
+                      </>
+                    ) : status === "creating-session" ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Preparing payment...
+                      </>
+                    ) : status === "awaiting-payment" ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Complete payment in popup...
                       </>
                     ) : (
                       <>
